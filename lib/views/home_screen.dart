@@ -2,7 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:jecle/views/pengelolaan_sampah_screen.dart';
 import 'package:jecle/views/pickup_screen.dart';
 import 'package:jecle/views/article_screen.dart';
+import 'package:jecle/views/login_screen.dart';
+import 'package:jecle/views/profile_screen.dart';
+import 'package:jecle/views/saldo_screen.dart';
+import 'package:jecle/views/dompet_screen.dart';
+import 'package:jecle/views/qr_scanner_screen.dart';
 import 'package:jecle/views/daur_ulang_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -10,23 +18,137 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late String _userId;
   int _selectedIndex = 0;
+  String _username = 'Nama Pengguna';
+  double _saldo = 0.0;
+  double _dompet = 0.0;
 
-  // List of colors for each bottom navigation bar item
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserDataFromApi();
+  }
+
+  Future<void> _fetchUserDataFromApi() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _userId = user.uid;
+
+      try {
+        print('Fetching user data for user with ID: $_userId'); // Debugging
+        // Fetch the user data from the API
+        final response = await http.get(Uri.parse(
+            'https://jeclebase-8fe6f-default-rtdb.firebaseio.com/users/$_userId.json'));
+
+        if (response.statusCode == 200) {
+          Map<String, dynamic> userData = jsonDecode(response.body);
+          setState(() {
+            _username = userData['name'] ?? 'Nama Pengguna';
+            _saldo = (userData['saldo'] ?? 0).toDouble();
+            _dompet = (userData['dompet'] ?? 0.0).toDouble();
+          });
+          print('User data loaded successfully: $userData'); // Debugging
+        } else {
+          throw Exception('Failed to load user data');
+        }
+      } catch (error) {
+        print('Error fetching user data: $error'); // Debugging
+      }
+    }
+  }
+
   final List<Color> _itemColors = [
     Colors.blue, // Color for Home
     Colors.green, // Color for Scan
     Colors.red, // Color for Belanja
-    Colors.yellow, // Color for Profil
+    Colors.yellow, // Color for Exit
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (index == 3) {
+      _showExitConfirmationDialog();
+    } else if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => QRScannerScreen()),
+      );
+    } else {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
   }
 
-  // Helper function to build BottomNavigationBarItem with animated background color
+  void _showExitConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Center(
+            child: Text(
+              "Konfirmasi",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          content: Text("Apakah Anda ingin keluar Aplikasi?"),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      "Tidak",
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoginScreen(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 25, vertical: 8),
+                    child: Text(
+                      "Ya",
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   BottomNavigationBarItem _buildBottomNavigationBarItem(
       IconData iconData, String label, int index) {
     return BottomNavigationBarItem(
@@ -46,21 +168,31 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Profile section
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    color: Color.fromRGBO(48, 133, 195, 1),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    ).then((_) {
+                      // Reload data after returning from ProfileScreen
+                      _fetchUserDataFromApi();
+                    });
+                  },
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.person,
+                      color: Color.fromRGBO(48, 133, 195, 1),
+                    ),
                   ),
                 ),
                 SizedBox(width: 10),
                 Text(
-                  'Nama Pengguna',
+                  _username,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -69,7 +201,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          // Points and Wallet section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Container(
@@ -90,12 +221,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.attach_money, color: Colors.green),
-                          SizedBox(width: 5),
-                          Text('Saldo: Rp 100.000'),
-                        ],
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => SaldoScreen()),
+                          ).then((_) {
+                            // Reload data after returning from SaldoScreen
+                            _fetchUserDataFromApi();
+                          });
+                        },
+                        child: Row(
+                          children: [
+                            Icon(Icons.attach_money, color: Colors.green),
+                            SizedBox(width: 5),
+                            Text('Saldo: Rp ${_saldo.toStringAsFixed(0)}'),
+                          ],
+                        ),
                       ),
                       Row(
                         children: [
@@ -107,55 +250,32 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   Divider(height: 20, color: Colors.grey),
-                  Row(
-                    children: [
-                      Icon(Icons.account_balance_wallet, color: Colors.blue),
-                      SizedBox(width: 5),
-                      Text('Dompet: Rp 50.000'),
-                    ],
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => DompetScreen()),
+                      ).then((_) {
+                        // Reload data after returning from DompetScreen
+                        _fetchUserDataFromApi();
+                      });
+                    },
+                    child: Row(
+                      children: [
+                        Icon(Icons.account_balance_wallet, color: Colors.blue),
+                        SizedBox(width: 5),
+                        Text('Dompet: Rp ${_dompet.toStringAsFixed(0)}'),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-          SizedBox(height: 16),
-          // Informasi Isu Sampah section
-          GestureDetector(
-            onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => InformasiSampahScreen()),
-              // );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              // child: Container(
-              //   padding: EdgeInsets.all(16.0),
-              //   decoration: BoxDecoration(
-              //     borderRadius: BorderRadius.circular(12),
-              //     image: DecorationImage(
-              //       image: AssetImage('assets/images/informasi sampah.png'),
-              //       fit: BoxFit.cover,
-              //     ),
-              //   ),
-              //   child: Text(
-              //     'Informasi Isu Sampah',
-              //     style: TextStyle(
-              //       color: Colors.white,
-              //       fontSize: 18,
-              //       fontWeight: FontWeight.bold,
-              //     ),
-              //   ),
-              // ),
-            ),
-          ),
           SizedBox(height: 20),
-          // Pickup Sampah and Artikel Sampah section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Kotak 'Pickup Sampah'
               Container(
                 width: MediaQuery.of(context).size.width * 0.4,
                 height: 100,
@@ -187,8 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              SizedBox(width: 16), // Jarak antara kotak
-              // Kotak 'Artikel Sampah'
+              SizedBox(width: 16),
               Container(
                 width: MediaQuery.of(context).size.width * 0.4,
                 height: 100,
@@ -222,11 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-
-          SizedBox(
-              height:
-                  20), // Jarak Pick Up Sampah dengan Panduan Pengelolaan Sampah
-          // Panduan Pengelolaan Sampah section
+          SizedBox(height: 20),
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -261,10 +376,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SizedBox(height: 5),
-          // Lihat Selengkapnya section
           GestureDetector(
             onTap: () {
-              // Tambahkan logika untuk perubahan tampilan di sini
+              // Add logic for changing display here
             },
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -302,7 +416,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildBottomNavigationBarItem(Icons.home, 'Home', 0),
           _buildBottomNavigationBarItem(Icons.qr_code_scanner, 'Scan', 1),
           _buildBottomNavigationBarItem(Icons.shopping_cart, 'Belanja', 2),
-          _buildBottomNavigationBarItem(Icons.person, 'Profil', 3),
+          _buildBottomNavigationBarItem(Icons.exit_to_app, 'Exit', 3),
         ],
       ),
     );
