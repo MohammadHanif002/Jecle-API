@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:jecle/views/home_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:jecle/views/admin_home_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final FlutterSecureStorage _storage = FlutterSecureStorage();
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
 
   Future<Map<String, dynamic>> _login(BuildContext context) async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -33,14 +36,34 @@ class LoginScreen extends StatelessWidget {
         print('ID Token: $idToken');
       }
 
-      // Navigate to home screen
+      // Check if user is admin
+      DataSnapshot snapshot =
+          await _dbRef.child('users/${userCredential.user?.uid}').get();
+      if (snapshot.value == null) {
+        throw Exception('User data not found');
+      }
+
+      Map<String, dynamic> userData =
+          Map<String, dynamic>.from(snapshot.value as Map);
+      bool isAdmin = userData['isAdmin'] ?? false;
+
+      // Navigate to the appropriate screen
       Navigator.of(context).pop();
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(),
-        ),
-      );
+      if (isAdmin) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AdminHomeScreen(),
+          ),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(),
+          ),
+        );
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login successful')),
       );
@@ -116,7 +139,8 @@ class LoginScreen extends StatelessWidget {
                     ),
                     Text(
                       'Email Address',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     SizedBox(height: 5),
                     TextFormField(
@@ -136,7 +160,8 @@ class LoginScreen extends StatelessWidget {
                     SizedBox(height: 20),
                     Text(
                       'Password',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     SizedBox(height: 5),
                     TextFormField(
@@ -165,8 +190,8 @@ class LoginScreen extends StatelessWidget {
                     Center(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Color.fromRGBO(48, 133, 195, 1), // Background color
+                          backgroundColor: Color.fromRGBO(
+                              48, 133, 195, 1), // Background color
                           padding: EdgeInsets.symmetric(
                               vertical: 15.0, horizontal: 50.0),
                           shape: RoundedRectangleBorder(

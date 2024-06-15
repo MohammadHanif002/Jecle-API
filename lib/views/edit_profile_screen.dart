@@ -28,31 +28,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
-  }
-
-  Future<void> _loadUserData() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
-
-      if (idToken == null || idToken.isEmpty) {
-        // Handle the case where the token is missing
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (context) => HomeScreen()), // Adjust this as needed
-        );
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse(
-            'https://jeclebase-8fe6f-default-rtdb.firebaseio.com/users/$userId.json'),
-      );
-      if (response.statusCode == 200) {
-        Map<String, dynamic> userData = jsonDecode(response.body);
+    _loadUserData().then((result) {
+      if (result['status'] == 'success') {
+        Map<String, dynamic> userData = result['data'];
         setState(() {
           nameController.text = userData['name'] ?? '';
           phoneController.text = userData['phone'] ?? '';
@@ -62,7 +40,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ageController.text = userData['age'] ?? '';
           genderController.text = userData['gender'] ?? '';
         });
+      } else {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(result['message'])));
       }
+    });
+  }
+
+  Future<Map<String, dynamic>> _loadUserData() async {
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      return {"status": "error", "message": "User not logged in"};
+    }
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+
+    if (idToken == null || idToken.isEmpty) {
+      return {"status": "error", "message": "Token is missing or invalid"};
+    }
+
+    final response = await http.get(
+      Uri.parse(
+          'https://jeclebase-8fe6f-default-rtdb.firebaseio.com/users/$userId.json'),
+    );
+
+    if (response.statusCode == 200) {
+      Map<String, dynamic> userData = jsonDecode(response.body);
+      return {"status": "success", "data": userData};
+    } else {
+      return {"status": "error", "message": "Failed to fetch user data"};
     }
   }
 
@@ -98,10 +105,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_image != null) {
       imageUrl = await uploadImageToFirebaseStorage(_image!);
     }
-    await _saveDataToFirebase(imageUrl);
+    Map<String, dynamic> result = await _saveDataToFirebase(imageUrl);
+
+    if (result['status'] == 'success') {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(result['message'])));
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (context) => HomeScreen()));
+    } else {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(result['message'])));
+    }
   }
 
-  Future<void> _saveDataToFirebase(String imageUrl) async {
+  Future<Map<String, dynamic>> _saveDataToFirebase(String imageUrl) async {
     String name = nameController.text;
     String phone = phoneController.text;
     String address = addressController.text;
@@ -132,18 +149,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
 
         if (response.statusCode == 200) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Data successfully saved to Firebase')));
-          Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (context) => HomeScreen()));
+          return {
+            "status": "success",
+            "message": "Data successfully saved to Firebase"
+          };
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to save data: ${response.body}')));
+          return {
+            "status": "error",
+            "message": "Failed to save data: ${response.body}"
+          };
         }
+      } else {
+        return {"status": "error", "message": "User ID or token is missing"};
       }
     } catch (error) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('An error occurred: $error')));
+      return {"status": "error", "message": "An error occurred: $error"};
     }
   }
 

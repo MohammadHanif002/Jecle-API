@@ -17,7 +17,7 @@ class SignUpScreen extends StatelessWidget {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _postalCodeController = TextEditingController();
 
-  void _signUp(BuildContext context) async {
+  Future<String?> _signUp(BuildContext context) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('username', _usernameController.text);
 
@@ -38,10 +38,12 @@ class SignUpScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Registration successful')),
       );
+      return null; // Registration successful, no error message
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Registration failed: $e')),
       );
+      return e.toString(); // Return the error message
     }
   }
 
@@ -63,8 +65,8 @@ class SignUpScreen extends StatelessWidget {
         'phone': _phoneController.text,
         'postalCode': _postalCodeController.text,
         'profileImage': '',
-        'dompet' : 0,
-        'saldo' : 0
+        'dompet': 0,
+        'saldo': 0
       }),
     );
 
@@ -149,8 +151,15 @@ class SignUpScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(16.0),
                           ),
                         ),
-                        onPressed: () {
-                          _signUp(context);
+                        onPressed: () async {
+                          String? errorMessage = await _signUp(context);
+                          if (errorMessage != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text(
+                                      'Registration failed: $errorMessage')),
+                            );
+                          }
                         },
                         child: Text(
                           'Sign Up',

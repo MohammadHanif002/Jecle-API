@@ -24,8 +24,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileData();
   }
 
-  Future<void> _loadProfileData() async {
+  Future<Map<String, dynamic>> _loadProfileData() async {
     User? user = FirebaseAuth.instance.currentUser;
+    Map<String, dynamic> result = {"status": false, "message": "Unknown error"};
+
     if (user != null) {
       _userId = user.uid;
 
@@ -48,17 +50,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _isFirstTime = userData.isEmpty;
                 _isLoading = false;
               });
+
+              result = {
+                "status": true,
+                "message": "Profile data loaded successfully"
+              };
             } else {
               setState(() {
                 _isFirstTime = true;
                 _isLoading = false;
               });
+
+              result = {
+                "status": false,
+                "message": "No profile data found, first time user"
+              };
             }
           } else {
             setState(() {
               _isFirstTime = true;
               _isLoading = false;
             });
+
+            result = {
+              "status": false,
+              "message":
+                  "Failed to load profile data, status code: ${response.statusCode}"
+            };
           }
         }
       } catch (error) {
@@ -66,11 +84,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isFirstTime = true;
           _isLoading = false;
         });
+
+        result = {"status": false, "message": "Exception occurred: $error"};
       }
     } else {
       setState(() {
         _isLoading = false;
       });
+
+      result = {"status": false, "message": "User is not logged in"};
     }
 
     if (_isFirstTime) {
@@ -80,6 +102,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       });
     }
+
+    return result;
   }
 
   @override

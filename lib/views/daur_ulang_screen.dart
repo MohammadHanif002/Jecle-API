@@ -34,23 +34,27 @@ class _DaurUlangScreenState extends State<DaurUlangScreen> {
         Uri.parse(
             'https://jeclebase-8fe6f-default-rtdb.firebaseio.com/product.json'),
       );
-
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        final List<Product> fetchedProducts = [];
-        data.forEach((key, value) {
-          final product = Product(
-            id: key,
-            name: value['name'],
-            imageUrl: value['imageUrl'],
-            price: value['price'].toDouble(),
-          );
-          fetchedProducts.add(product);
-        });
-
-        setState(() {
-          products = fetchedProducts;
-        });
+        final Map<String, dynamic>? data = jsonDecode(response.body);
+        if (data != null) {
+          final List<Product> fetchedProducts = [];
+          data.forEach((key, value) {
+            final product = Product(
+              id: key,
+              name: value['name'] ?? '',
+              imageUrl: value['imageUrl'] ?? '',
+              price: (value['price'] ?? 0).toDouble(),
+            );
+            fetchedProducts.add(product);
+          });
+          setState(() {
+            products = fetchedProducts;
+          });
+        } else {
+          print('No data found');
+        }
       } else {
         print('Failed to fetch products: ${response.statusCode}');
       }
@@ -71,7 +75,8 @@ class _DaurUlangScreenState extends State<DaurUlangScreen> {
           'quantity': product.quantity,
         }),
       );
-
+      print('Add to cart response status: ${response.statusCode}');
+      print('Add to cart response body: ${response.body}');
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -84,7 +89,6 @@ class _DaurUlangScreenState extends State<DaurUlangScreen> {
     } catch (error) {
       print('Error adding product to cart: $error');
     }
-
     setState(() {
       final existingProduct = cart.firstWhere(
         (p) => p.id == product.id,
@@ -111,7 +115,6 @@ class _DaurUlangScreenState extends State<DaurUlangScreen> {
       );
       return;
     }
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -170,10 +173,15 @@ class _DaurUlangScreenState extends State<DaurUlangScreen> {
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(12),
                       ),
-                      child: Image.asset(
-                        product.imageUrl,
-                        fit: BoxFit.cover,
-                      ),
+                      child: product.imageUrl.startsWith('http')
+                          ? Image.network(
+                              product.imageUrl,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.asset(
+                              product.imageUrl.replaceFirst('file://', ''),
+                              fit: BoxFit.cover,
+                            ),
                     ),
                   ),
                   Padding(
@@ -235,7 +243,6 @@ class Product {
   final String imageUrl;
   final double price;
   int quantity;
-
   Product({
     required this.id,
     required this.name,
